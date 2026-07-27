@@ -92,13 +92,22 @@ frameworks on the two things below instead.
 | | Strands | Claude Agent SDK |
 |---|---|---|
 | Anthropic API | ✓ | ✓ |
-| Bedrock / Vertex | ✓ | ✓ (Claude on those clouds) |
-| OpenAI, Gemini, Mistral… | ✓ | ✗ |
-| **Local / offline** (Ollama, LM Studio) | ✓ | ✗ |
+| Bedrock / Vertex / Foundry | ✓ | ✓ (Claude on those clouds) |
+| OpenAI, Gemini, Mistral… | ✓ (first-class) | ✗ officially — only via a proxy |
+| **Local / offline** (Ollama, LM Studio) | ✓ (first-class) | ✗ officially — only via a proxy |
 
 This repo demonstrates the gap directly: `lm-studio/` is `aws-Strands/` with
 `model=get_model()` added, and it runs fully offline against Gemma 4 E4B.
-**That variant is not expressible with the Agent SDK at all.**
+
+The Agent SDK has no equivalent switch. There is an unofficial escape hatch —
+the SDK forwards `options.env` verbatim to the Claude Code CLI subprocess, so
+setting `ANTHROPIC_BASE_URL` to an Anthropic-API-compatible gateway (LiteLLM
+proxy, `claude-code-router`) points it at whatever that gateway fronts,
+including a local model. But that is unsupported, and the work moves rather
+than disappearing: the CLI expects Messages API semantics throughout — tool-use
+blocks, thinking blocks, streaming event shapes, structured output — so the
+proxy has to synthesize all of it. Strands does the same translation in-process
+with a `model=` argument and no extra service to run.
 
 If offline operation, model-cost arbitrage, or provider independence matters,
 this row decides it and nothing below outweighs it.
