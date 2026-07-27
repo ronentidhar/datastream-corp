@@ -4,3 +4,4 @@ __pycache__/
 .env
 sessions/
 datastream_corp.original.db
+.idea/
