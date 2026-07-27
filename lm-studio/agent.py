@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 from strands import Agent, tool
 from strands.hooks import BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPClient
+from strands.types.agent import Limits
 from strands_tools import http_request
 
 from local_model import get_model
@@ -125,7 +126,7 @@ mcp_client = MCPClient(
 # Safety cap on the agent loop. Small local models sometimes never emit a
 # terminal answer — they keep calling tools forever. This bounds every
 # invocation so a weak model degrades to a partial answer instead of looping.
-TURN_LIMIT = {"turns": 8}
+TURN_LIMIT: Limits = {"turns": 8}
 
 
 def drain_interrupts(agent_obj, result):
