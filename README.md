@@ -21,6 +21,7 @@ The same code runs two ways — the only difference is the model backend:
 
 ## Links
 
+- **Why Strands?** — framework vs. direct API, and what it costs: [docs/why-strands.md](docs/why-strands.md)
 - **Strands docs** — Python quickstart: https://strandsagents.com/docs/user-guide/quickstart/python/
 - **Event dashboard** — https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US
 - **Workshop IDE** (hosted VS Code with this project) — https://d2tj74ynxyuqnb.cloudfront.net/?folder=/workshop/datastream-corp
