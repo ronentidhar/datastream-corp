@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "allow": [
+      "mcp__datastream__query_db",
+      "mcp__datastream__list_schema",
+      "WebFetch(domain:geocoding-api.open-meteo.com)",
+      "WebFetch(domain:api.open-meteo.com)"
+    ],
+    "deny": [
+      "Write",
+      "Edit",
+      "Bash",
+      "WebSearch"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__datastream__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p logs && cat >> logs/audit-shell.jsonl"
+          }
+        ]
+      }
+    ]
+  }
+}

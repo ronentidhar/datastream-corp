@@ -4,4 +4,7 @@ __pycache__/
 .env
 sessions/
 datastream_corp.original.db
+# Transient SQLite WAL sidecars -- never part of the vendored snapshot.
+*.db-shm
+*.db-wal
 .idea/

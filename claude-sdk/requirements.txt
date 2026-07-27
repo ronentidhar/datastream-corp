@@ -1,0 +1,10 @@
+# Installed into the SHARED root venv (../.venv, Python 3.13) alongside the
+# Strands packages -- see the repo README. There is no venv in this folder.
+#
+#   uv pip install --python ../.venv/bin/python -r requirements.txt
+#
+claude-agent-sdk>=0.2.128
+pydantic>=2.0
+# HTTP mode only (http_app.py); not needed for the CLI or cron modes.
+fastapi>=0.115
+uvicorn>=0.30

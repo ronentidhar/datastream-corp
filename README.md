@@ -1,4 +1,98 @@
-# DataStream Corp — Strands Agent (AWS PACE GenAI bootcamp)
+# DataStream Corp — agent playground (AWS PACE GenAI bootcamp)
+
+Two unrelated agent builds kept side by side, to compare what a framework gives
+you against what a first-party SDK gives you.
+
+| | [`aws-Strands/`](aws-Strands) + [`lm-studio/`](lm-studio) | [`claude-sdk/`](claude-sdk) |
+|---|---|---|
+| Framework | [Strands](https://strandsagents.com) | [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk) |
+| Shape | Multi-agent orchestrator + specialists | Single unattended service |
+| Config | In code | Loaded from disk (`CLAUDE.md`, hooks, skills, subagents) |
+| Task | Answer questions about the data | Find data-integrity anomalies in it (`--freeform` also answers plain questions) |
+| Specialists | `data_agent` + `weather_agent` as `@tool`-wrapped nested `Agent`s | `db-analyst` + `weather` as `.claude/agents/*.md`, invoked via `Task` |
+| Database | `datastream_corp.db` | same data, vendored copy |
+| MCP server | `mcp_server.py` | byte-identical copy of it |
+| Write guard | `BeforeToolCallEvent` + `is_destructive()` | `PreToolUse` hook + same keyword set |
+
+**Same data, same MCP tools, same write-guard problem** — so this is a genuine
+like-for-like comparison of the two approaches. `claude-sdk/` keeps its own
+copies of `mcp_server.py` and `datastream_corp.db` rather than reaching across:
+the Strands folders are workshop exercises meant to be edited in place, and the
+service shouldn't change behaviour when someone completes a lab step. Check for
+drift with `diff claude-sdk/mcp_server.py aws-Strands/mcp_server.py`.
+
+They still share no code — but they do share **one virtualenv** at the repo
+root (Python 3.13), so there is a single `uv pip install` to run. See
+[One-time setup](#one-time-setup-all-three-variants).
+
+## Links
+
+- **Why Strands?** — framework vs. direct API, and what it costs: [docs/why-strands.md](docs/why-strands.md)
+- **Claude Agent SDK write-up** — config-loading model, hooks, costs: [claude-sdk/README.md](claude-sdk/README.md)
+- **Strands docs** — Python quickstart: https://strandsagents.com/docs/user-guide/quickstart/python/
+- **Event dashboard** — https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US
+- **Workshop IDE** (hosted VS Code with this project) — https://d2tj74ynxyuqnb.cloudfront.net/?folder=/workshop/datastream-corp
+- **Workshop instructions** (phases) — https://d1ck76obc96z7d.cloudfront.net/phase/1
+
+## One-time setup (all three variants)
+
+One virtualenv at the repo root serves all three variants. Created with
+[uv](https://docs.astral.sh/uv/):
+
+```bash
+# from the repo root
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python \
+  strands-agents strands-agents-tools mcp openai \
+  claude-agent-sdk pydantic fastapi uvicorn
+```
+
+The first line of packages is Strands, the second is the Agent SDK service
+(`fastapi`/`uvicorn` only if you want its HTTP mode).
+
+Every command below uses a **relative** path to that venv (`.venv/bin/python`,
+or `../.venv/bin/python` from inside a variant folder), so they work unchanged
+in the [hosted workshop IDE](https://d2tj74ynxyuqnb.cloudfront.net/?folder=/workshop/datastream-corp)
+as well as locally. `claude-sdk/.mcp.json` uses the same relative path — **do
+not replace it with an absolute one**, or the workshop environment breaks.
+
+> The workshop material targets Python 3.12; this repo runs 3.13, verified end
+> to end — a full `lm-studio/agent.py` run (orchestrator, MCP database queries,
+> weather specialist) completes normally. `uv venv --python 3.12 .venv` is a
+> safe fallback; the Agent SDK supports 3.10+, so `claude-sdk/` works there too.
+
+> MCP servers are spawned automatically by each agent over stdio — you never
+> start one yourself.
+
+### IDE interpreter (macOS, optional)
+
+The IDE interpreter does **not** have to be the one you run with — it only needs
+the same packages so imports resolve. Pointing it at the project `.venv` works,
+but that path is fragile: recreating the venv, or switching Python version,
+invalidates the IDE's cached `site-packages` root and every import goes red.
+
+A stable alternative on macOS — a Python outside the repo that nothing here can
+move or delete:
+
+```bash
+brew install python@3.13
+/opt/homebrew/bin/python3.13 -m pip install --break-system-packages \
+  strands-agents strands-agents-tools mcp openai \
+  claude-agent-sdk pydantic fastapi uvicorn
+```
+
+Then point Rider/PyCharm at `/opt/homebrew/bin/python3.13` (Settings →
+Languages & Frameworks → Python → Python Interpreter → Add Interpreter →
+Existing). Homebrew's Python is [PEP 668](https://peps.python.org/pep-0668/)
+"externally managed", hence `--break-system-packages`; those packages are shared
+across every project on the machine, which is the trade for stability.
+
+**Editor-side only.** Runtime still uses `.venv`, so the workshop environment is
+unaffected.
+
+---
+
+# 1. Strands multi-agent app
 
 A [Strands](https://strandsagents.com) multi-agent app for a fictional company,
 "DataStream Corp". An orchestrator delegates to two specialists:
@@ -19,32 +113,8 @@ The same code runs two ways — the only difference is the model backend:
 `lm-studio/` is a copy wired to a local model so it runs off AWS — see
 [`lm-studio/local_model.py`](lm-studio/local_model.py).
 
-## Links
-
-- **Why Strands?** — framework vs. direct API, and what it costs: [docs/why-strands.md](docs/why-strands.md)
-- **Strands docs** — Python quickstart: https://strandsagents.com/docs/user-guide/quickstart/python/
-- **Event dashboard** — https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US
-- **Workshop IDE** (hosted VS Code with this project) — https://d2tj74ynxyuqnb.cloudfront.net/?folder=/workshop/datastream-corp
-- **Workshop instructions** (phases) — https://d1ck76obc96z7d.cloudfront.net/phase/1
-
----
-
-## One-time setup (shared)
-
-Both variants use one virtualenv at the repo root. It's created with
-[uv](https://docs.astral.sh/uv/):
-
-```bash
-# from the repo root
-uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python strands-agents strands-agents-tools mcp openai
-```
-
-> The MCP server is spawned automatically by the agent (stdio transport), so you
-> don't start it yourself. Each variant reads the `datastream_corp.db` sitting in
-> its own folder.
-
----
+Both read the `datastream_corp.db` sitting in their own folder. Setup is the
+shared one above.
 
 ## Run the LM Studio (local) agent — no AWS needed
 
@@ -70,8 +140,6 @@ Notes:
 - A `TURN_LIMIT` safety cap bounds the agent loop so a weak local model can't run
   away in an infinite tool-calling loop.
 - On a 24 GB Mac, keep only one model loaded at a time (the 26B is ~15 GB).
-
----
 
 ## Run the AWS Bedrock (cloud) agent
 
@@ -104,9 +172,7 @@ Notes:
     --query "modelSummaries[?contains(modelId,'anthropic')].modelId" --output text
   ```
 
----
-
-## What's in each folder
+## What's in each Strands folder
 
 | File | What it is |
 |------|-----------|
@@ -120,3 +186,69 @@ Notes:
 The two folders share the same `agent-*.py` / `mcp_server.py` logic; in
 `lm-studio/` every `Agent(...)` is created with `model=get_model()` instead of
 Strands' Bedrock default.
+
+---
+
+# 2. Claude Agent SDK ops monitor
+
+An unattended monitoring service on the [Claude Agent
+SDK](https://code.claude.com/docs/en/agent-sdk) that **reuses Claude Code
+configuration from disk** rather than rebuilding it in a framework — `CLAUDE.md`,
+`.claude/settings.json` hooks, `.claude/skills/`, `.claude/agents/`, `.mcp.json`.
+No hand-rolled agent loop, tool dispatch, context management, or permission
+system.
+
+It audits `datastream_corp.db` for three data-integrity problems that are
+genuinely in the workshop data — projects long past their `end_date` but still
+`active`, assignments left open on a `completed` project, and department payroll
+running 5–11× the stated budget — and returns a schema-validated incident
+report.
+
+A `PreToolUse` hook enforces, in code, that it can never write to the database
+without human sign-off. That's the sharp edge of the comparison: `query_db` runs
+reads *and* writes through one tool, so "reads only" can't be expressed as a
+tool-name permission rule in either framework — both have to inspect the SQL.
+
+Full write-up — the SDK's config-loading model, hook semantics, invocation
+modes, cost per run, and when to use `claude -p` instead:
+**[claude-sdk/README.md](claude-sdk/README.md)**.
+
+## Setup
+
+Nothing extra — it uses the shared root venv from
+[One-time setup](#one-time-setup-all-three-variants). No seeding step either:
+the database is a copy of the workshop one and the anomalies are already in it.
+
+No Claude Code CLI or Node install needed — the SDK ships its own binary.
+Credentials come from the environment: `ANTHROPIC_API_KEY`, or your existing
+Claude Code login as a fallback.
+
+## Run it
+
+```bash
+cd claude-sdk
+
+# CLI one-shot — JSON on stdout, transcript on stderr
+../.venv/bin/python service.py
+../.venv/bin/python service.py "Check for overdue projects only."
+
+# Prove the safety hook blocks a write even under bypassPermissions
+../.venv/bin/python verify_hook.py
+
+# HTTP endpoint
+../.venv/bin/uvicorn http_app:app --port 8080
+curl -sX POST localhost:8080/run -H 'content-type: application/json' \
+     -d '{"prompt":"Check for overdue projects."}' | jq
+```
+
+Useful env vars: `MONITOR_MODEL` (e.g. `claude-haiku-4-5`, ~5× cheaper),
+`MONITOR_MAX_USD` (hard per-run budget, default `1.00`), `MONITOR_PROVIDER`
+(`anthropic` | `bedrock` | `vertex`), `MONITOR_LOG_LEVEL` (`DEBUG` also shows
+the CLI subprocess's stderr).
+
+Like the Strands variants, a run streams a live transcript to **stderr** —
+the model's narration and every tool call — while **stdout** stays pure JSON.
+So `| jq` works, and `2>/dev/null` gives you just the result. Everything is
+also appended to `claude-sdk/logs/audit.jsonl`.
+
+A run costs roughly **$0.09–$0.37** on Opus 5.
