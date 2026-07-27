@@ -27,7 +27,8 @@ root (Python 3.13), so there is a single `uv pip install` to run. See
 
 ## Links
 
-- **Why Strands?** — framework vs. direct API, and what it costs: [docs/why-strands.md](docs/why-strands.md)
+- **Strands vs. the raw API** — framework vs. hand-rolled loop, and what it costs: [docs/strands_vs_raw_api.md](docs/strands_vs_raw_api.md)
+- **Strands vs. the Agent SDK** — framework vs. framework, and why the line counts mislead: [docs/strands-vs-agent-sdk.md](docs/strands-vs-agent-sdk.md)
 - **Claude Agent SDK write-up** — config-loading model, hooks, costs: [claude-sdk/README.md](claude-sdk/README.md)
 - **Strands docs** — Python quickstart: https://strandsagents.com/docs/user-guide/quickstart/python/
 - **Event dashboard** — https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US
