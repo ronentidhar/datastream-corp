@@ -19,6 +19,13 @@ The same code runs two ways — the only difference is the model backend:
 `lm-studio/` is a copy wired to a local model so it runs off AWS — see
 [`lm-studio/local_model.py`](lm-studio/local_model.py).
 
+## Links
+
+- **Strands docs** — Python quickstart: https://strandsagents.com/docs/user-guide/quickstart/python/
+- **Event dashboard** — https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US
+- **Workshop IDE** (hosted VS Code with this project) — https://d2tj74ynxyuqnb.cloudfront.net/?folder=/workshop/datastream-corp
+- **Workshop instructions** (phases) — https://d1ck76obc96z7d.cloudfront.net/phase/1
+
 ---
 
 ## One-time setup (shared)
