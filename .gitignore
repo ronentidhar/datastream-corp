@@ -8,3 +8,7 @@ datastream_corp.original.db
 *.db-shm
 *.db-wal
 .idea/
+
+# AgentCore deploy artifacts (machine-specific config + build cache)
+.bedrock_agentcore/
+.bedrock_agentcore.yaml
