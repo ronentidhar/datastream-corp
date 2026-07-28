@@ -1,0 +1,11 @@
+bedrock-agentcore-starter-toolkit==0.2.6
+aws-opentelemetry-distro>=0.10.0
+PyJWT
+strands-agents
+strands-agents-tools
+mcp_proxy_for_aws
+boto3
+requests
+python-dotenv
+fastmcp
+pyyaml
