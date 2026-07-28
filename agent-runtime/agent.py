@@ -38,6 +38,15 @@ CREDENTIAL_PROVIDER_NAME = os.environ.get(
 )
 MCP_SCOPE = os.environ.get("COGNITO_SCOPE", "datastream/mcp.access")
 
+# Retrieval gate for long-term facts. Measured against this memory, a stored
+# preference ("The user prefers JSON format for reports.") scores ~0.37 against a
+# task-shaped prompt ("Query the database for employee count and generate a
+# report"). The 0.7 the task specifies discards both facts, so nothing is ever
+# recalled. Facts are short and the actor namespace is small, so a lower gate with
+# top_k=5 is the right trade here.
+MEMORY_RELEVANCE = float(os.environ.get("MEMORY_RELEVANCE_SCORE", "0.3"))
+MEMORY_TOP_K = int(os.environ.get("MEMORY_TOP_K", "5"))
+
 ACTOR_HEADER = "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Actor-Id"
 
 
@@ -142,8 +151,8 @@ def invoke(payload, context: RequestContext, access_token: str):
         actor_id=actor_id,
         retrieval_config={
             "/strategies/{memoryStrategyId}/actors/{actorId}": RetrievalConfig(
-                top_k=5,
-                relevance_score=0.7,
+                top_k=MEMORY_TOP_K,
+                relevance_score=MEMORY_RELEVANCE,
                 strategy_id=LONG_TERM_MEMORY_STRATEGY_ID,
             )
         },
