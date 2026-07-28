@@ -12,3 +12,7 @@ datastream_corp.original.db
 # AgentCore deploy artifacts (machine-specific config + build cache)
 .bedrock_agentcore/
 .bedrock_agentcore.yaml
+
+# requirements.txt is copied into the build dirs by the deploy scripts
+mcp-runtime/requirements.txt
+agent-runtime/requirements.txt
