@@ -19,11 +19,11 @@
 
 """DataStream Corp orchestrator — data specialist + weather specialist."""
 
+import os
 import re
-import sys
 from typing import Any
 
-from mcp import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 from pydantic import BaseModel, Field, field_validator
 from strands import Agent, tool
 from strands.hooks import BeforeToolCallEvent, HookProvider, HookRegistry
@@ -113,10 +113,16 @@ class ApprovalHook(HookProvider):
 # --------------------------------------------------------------------------
 # Shared MCP client
 # --------------------------------------------------------------------------
+# The MCP server runs as its own process (streamable-http on :8000) -- start it
+# with `python mcp_server.py` before running this agent. MCP_URL points at the
+# AgentCore endpoint once deployed; MCP_BEARER_TOKEN carries the Cognito token
+# when the endpoint requires JWT auth.
+MCP_URL = os.environ.get("MCP_URL", "http://localhost:8000/mcp")
+_token = os.environ.get("MCP_BEARER_TOKEN")
+_headers = {"Authorization": f"Bearer {_token}"} if _token else None
+
 mcp_client = MCPClient(
-    lambda: stdio_client(
-        StdioServerParameters(command=sys.executable, args=["mcp_server.py"])
-    )
+    lambda: streamablehttp_client(url=MCP_URL, headers=_headers)
 )
 
 
