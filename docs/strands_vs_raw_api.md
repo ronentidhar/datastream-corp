@@ -1,4 +1,4 @@
-# Strands vs. the raw API
+****# Strands vs. the raw API
 
 For the other comparison — Strands against the Claude Agent SDK, framework vs.
 framework — see [`docs/strands-vs-agent-sdk.md`](strands-vs-agent-sdk.md).
