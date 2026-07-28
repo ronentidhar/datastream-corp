@@ -40,6 +40,23 @@ MCP_SCOPE = os.environ.get("COGNITO_SCOPE", "datastream/mcp.access")
 
 ACTOR_HEADER = "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Actor-Id"
 
+
+def header_value(headers, name: str, default: str) -> str:
+    """Case-insensitive header lookup.
+
+    The runtime normalises only Authorization to a canonical key; every other
+    forwarded header keeps its wire casing, and HTTP/2 lowercases all of them. An
+    exact-case dict lookup therefore misses the actor header and every caller
+    silently collapses to the default actor, sharing one memory namespace.
+    """
+    if not headers:
+        return default
+    target = name.lower()
+    for key, value in headers.items():
+        if key.lower() == target:
+            return value or default
+    return default
+
 DESTRUCTIVE_KEYWORDS = {
     "insert", "update", "delete", "drop", "alter", "create",
     "replace", "truncate", "attach", "detach", "pragma", "vacuum",
@@ -115,10 +132,9 @@ Report temperature in Celsius and translate weather_code into plain words.
     auth_flow="M2M",
 )
 def invoke(payload, context: RequestContext, access_token: str):
-    actor_id = "default_user"
-    if context.request_headers:
-        actor_id = context.request_headers.get(ACTOR_HEADER, "default_user")
+    actor_id = header_value(context.request_headers, ACTOR_HEADER, "default_user")
     session_id = context.session_id or "default_session"
+    print(f"actor_id={actor_id} session_id={session_id}", flush=True)
 
     memory_config = AgentCoreMemoryConfig(
         memory_id=MEMORY_ID,
