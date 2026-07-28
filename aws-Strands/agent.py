@@ -21,8 +21,10 @@
 
 import os
 import re
+import sys
 from typing import Any
 
+import requests
 from mcp.client.streamable_http import streamablehttp_client
 from pydantic import BaseModel, Field, field_validator
 from strands import Agent, tool
@@ -118,13 +120,63 @@ class ApprovalHook(HookProvider):
 # --------------------------------------------------------------------------
 # Shared MCP client
 # --------------------------------------------------------------------------
-# The MCP server runs as its own process (streamable-http on :8000) -- start it
-# with `python mcp_server.py` before running this agent. MCP_URL points at the
-# AgentCore endpoint once deployed; MCP_BEARER_TOKEN carries the Cognito token
-# when the endpoint requires JWT auth.
-MCP_URL = os.environ.get("MCP_URL", "http://localhost:8000/mcp")
-_token = os.environ.get("MCP_BEARER_TOKEN")
-_headers = {"Authorization": f"Bearer {_token}"} if _token else None
+# Endpoint precedence, so `source ../.env && python agent.py` does the right thing
+# in either mode without extra exports:
+#
+#   1. MCP_URL             -- explicit override, always wins
+#   2. GATEWAY_ID in .env  -- the deployed AgentCore Gateway (Phase 2)
+#   3. localhost:8000      -- a local `python mcp_server.py` (Phase 1)
+#
+# Remote endpoints need a Cognito JWT. MCP_BEARER_TOKEN is used if set, otherwise
+# one is minted from the client credentials in .env.
+
+
+def _mint_cognito_token() -> str | None:
+    """client_credentials token, or None if .env lacks the pieces."""
+    domain = os.environ.get("COGNITO_DOMAIN")
+    client_id = os.environ.get("CLIENT_ID")
+    secret = os.environ.get("CLIENT_SECRET")
+    region = os.environ.get("REGION", "us-east-1")
+    if not (domain and client_id and secret):
+        return None
+    try:
+        resp = requests.post(
+            f"https://{domain}.auth.{region}.amazoncognito.com/oauth2/token",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            auth=(client_id, secret),
+            data={
+                "grant_type": "client_credentials",
+                "scope": os.environ.get("COGNITO_SCOPE", "datastream/mcp.access"),
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json().get("access_token")
+    except Exception as e:  # noqa: BLE001 - fall back to unauthenticated
+        print(f"could not mint a Cognito token: {e}", file=sys.stderr)
+        return None
+
+
+def _resolve_mcp() -> tuple[str, dict[str, str] | None]:
+    url = os.environ.get("MCP_URL")
+    if not url and os.environ.get("GATEWAY_ID"):
+        region = os.environ.get("REGION", "us-east-1")
+        url = (
+            f"https://{os.environ['GATEWAY_ID']}"
+            f".gateway.bedrock-agentcore.{region}.amazonaws.com/mcp"
+        )
+    if not url:
+        url = "http://localhost:8000/mcp"
+
+    token = os.environ.get("MCP_BEARER_TOKEN")
+    if url.startswith("https://") and not token:
+        token = _mint_cognito_token()
+
+    print(f"MCP endpoint: {url}", file=sys.stderr)
+    return url, ({"Authorization": f"Bearer {token}"} if token else None)
+
+
+MCP_URL, _headers = _resolve_mcp()
 
 mcp_client = MCPClient(
     lambda: streamablehttp_client(url=MCP_URL, headers=_headers)
