@@ -93,21 +93,25 @@ agentcore deploy -a "$AGENT_NAME"
 # 4. Wait for ACTIVE, capture the ARN
 # ---------------------------------------------------------------------------
 cd ..
-echo "==> waiting for ${AGENT_NAME} to reach ACTIVE"
+# Runtimes settle on READY. The task write-up says ACTIVE; accept either.
+echo "==> waiting for ${AGENT_NAME} to become READY"
 for i in $(seq 1 40); do
   read -r STATUS ARN <<<"$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
     --query "agentRuntimes[?agentRuntimeName=='${AGENT_NAME}'].[status,agentRuntimeArn] | [0]" \
     --output text 2>/dev/null || echo "NONE NONE")"
   echo "    [${i}] status=${STATUS}"
   case "$STATUS" in
-    ACTIVE) break ;;
+    READY|ACTIVE) break ;;
     CREATE_FAILED|UPDATE_FAILED|DELETING)
       echo "deploy failed with status ${STATUS}; check: agentcore status -a ${AGENT_NAME}" >&2; exit 1 ;;
   esac
   sleep 15
 done
 
-[ "${STATUS:-}" = "ACTIVE" ] || { echo "timed out waiting for ACTIVE" >&2; exit 1; }
+case "${STATUS:-}" in
+  READY|ACTIVE) ;;
+  *) echo "timed out waiting for READY (last status: ${STATUS:-none})" >&2; exit 1 ;;
+esac
 
 MCP_SERVER_ARN="$ARN"
 echo "==> MCP_SERVER_ARN=${MCP_SERVER_ARN}"
