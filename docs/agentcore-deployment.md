@@ -56,12 +56,18 @@ edit of it:
 | | `aws-Strands/agent.py` | `agent-runtime/agent.py` |
 |---|---|---|
 | Entry | `python agent.py` | `@app.entrypoint` on `BedrockAgentCoreApp` |
-| Tools | MCP over streamable-http to localhost | MCP over HTTPS to the Gateway |
+| Tools | MCP over streamable-http; Gateway if `GATEWAY_ID` is set, else localhost | MCP over HTTPS to the Gateway |
 | Session state | in-process | `AgentCoreMemorySessionManager` |
 | Identity | none | actor id from a forwarded header |
 | Config | `.env` | runtime env vars (`agentcore deploy --env`) |
 
 Both keep the same `ApprovalHook` + `is_destructive()` write guard.
+
+`aws-Strands/agent.py` therefore works in either world: with `GATEWAY_ID` in `.env`
+it runs against the deployed stack (minting its own Cognito token), and without one
+it falls back to a local `python mcp_server.py`. Override with `MCP_URL` to pin it
+explicitly. It prints the resolved endpoint to stderr, which is the quickest way to
+tell which mode you're in.
 
 ## Where the sample code needed fixing
 

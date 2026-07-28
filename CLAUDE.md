@@ -54,6 +54,15 @@ Both are gitignored. Load with `set -a; source .env; set +a` — root `.env` mix
 bare `KEY=value` (written by the workshop) with `export KEY="value"` (written by the
 scripts), and `set -a` exports both.
 
+## Which MCP endpoint an agent uses
+
+`aws-Strands/agent.py` resolves it as `MCP_URL` → Gateway built from `GATEWAY_ID` →
+`http://localhost:8000/mcp`, minting a Cognito token from `.env` for a remote
+endpoint. It prints the choice to stderr at startup — check that line first when
+tool calls fail, since a Phase 1 clone with no `GATEWAY_ID` silently expects a local
+`python mcp_server.py`. `agent-runtime/agent.py` always uses the Gateway and has no
+local mode.
+
 ## Gotchas that cost real time
 
 - **Session IDs pin to an agent version.** After a redeploy, reusing an old

@@ -166,9 +166,25 @@ access enabled** (region `us-east-1` recommended).
 2. **Run the demo** (source the creds in the *same* shell):
    ```bash
    cd aws-Strands
-   source .env
+   set -a; source .env; source ../.env; set +a
    PYTHONPATH=. ../.venv/bin/python agent.py
    ```
+
+   The agent talks to its MCP server over streamable-http and picks the endpoint
+   in this order — it prints the one it chose to stderr on startup:
+
+   | | Endpoint |
+   |---|---|
+   | `MCP_URL` set | that URL, always wins |
+   | `GATEWAY_ID` in root `.env` | the deployed AgentCore Gateway, with a token minted from `.env` |
+   | neither | `http://localhost:8000/mcp` |
+
+   For the localhost case, start the server first in another terminal:
+   ```bash
+   cd aws-Strands && ../.venv/bin/python mcp_server.py
+   ```
+   Once Phase 2 is deployed, `GATEWAY_ID` is already in `.env` and no local
+   server is needed. See [docs/agentcore-deployment.md](docs/agentcore-deployment.md).
 
 Notes:
 - Temporary (STS) credentials expire after a few hours — refresh `.env` and
