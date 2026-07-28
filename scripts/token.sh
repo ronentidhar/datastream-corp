@@ -57,6 +57,33 @@ new_session_id() {
     printf 'session_%s\n' "$(openssl rand -hex 13)"
 }
 
+# ask_http "<prompt>" [actor-id]
+# Same invoke over plain HTTPS: needs only a token, no agentcore CLI and no
+# .bedrock_agentcore.yaml, so it works from any directory or another machine.
+ask_http() {
+    local prompt="$1" actor="${2:-alice-chen}" token
+    token="$(get_client_token)" || return 1
+    (
+        set -a
+        # shellcheck disable=SC1091
+        source "${_DATASTREAM_ROOT}/.env"
+        set +a
+        : "${AGENT_RUNTIME_ARN:?not in .env -- run ./deploy_agent.sh first}"
+
+        local enc
+        enc="$(jq -rn --arg a "$AGENT_RUNTIME_ARN" '$a|@uri')"
+
+        curl -sS -X POST \
+            "https://bedrock-agentcore.${REGION}.amazonaws.com/runtimes/${enc}/invocations?qualifier=DEFAULT" \
+            -H "Authorization: Bearer ${token}" \
+            -H 'Content-Type: application/json' \
+            -H "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id: $(new_session_id)" \
+            -H "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Actor-Id: ${actor}" \
+            -d "{\"prompt\": $(jq -Rn --arg p "$prompt" '$p')}" \
+            | jq -r 'if .response.content then .response.content[0].text else . end'
+    )
+}
+
 # ask "<prompt>" [actor-id]
 ask() {
     local prompt="$1" actor="${2:-alice-chen}" token
