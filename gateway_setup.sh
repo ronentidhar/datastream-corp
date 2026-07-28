@@ -163,9 +163,13 @@ MCP_ENDPOINT="${MCP_SERVER_URL:-https://bedrock-agentcore.${REGION}.amazonaws.co
 
 echo "==> Gateway target ${TARGET_NAME}"
 echo "    endpoint=${MCP_ENDPOINT}"
-if ! aws bedrock-agentcore-control list-gateway-targets --region "$REGION" \
-      --gateway-identifier "$GATEWAY_ID" \
-      --query "items[?name=='${TARGET_NAME}'] | [0]" --output text 2>/dev/null | grep -q .; then
+EXISTING_TARGET="$(aws bedrock-agentcore-control list-gateway-targets --region "$REGION" \
+  --gateway-identifier "$GATEWAY_ID" \
+  --query "items[?name=='${TARGET_NAME}'].targetId | [0]" --output text 2>/dev/null || echo None)"
+
+# --output text yields the literal string "None" for an empty result, so test for
+# it explicitly -- `grep -q .` matches "None" and would skip creation entirely.
+if [ "$EXISTING_TARGET" = "None" ] || [ -z "$EXISTING_TARGET" ]; then
   aws bedrock-agentcore-control create-gateway-target \
     --region "$REGION" \
     --gateway-identifier "$GATEWAY_ID" \
@@ -194,9 +198,25 @@ JSON
 JSON
 )" \
     --output json | jq -r '"    targetId=\(.targetId) status=\(.status)"'
-  echo "    waiting 15s for target to become READY"
-  sleep 15
+else
+  echo "    target already exists (targetId=${EXISTING_TARGET})"
 fi
+
+echo "==> waiting for target to become READY"
+for i in $(seq 1 20); do
+  TSTATUS="$(aws bedrock-agentcore-control list-gateway-targets --region "$REGION" \
+    --gateway-identifier "$GATEWAY_ID" \
+    --query "items[?name=='${TARGET_NAME}'].status | [0]" --output text 2>/dev/null || echo None)"
+  echo "    [${i}] status=${TSTATUS}"
+  case "$TSTATUS" in
+    READY|ACTIVE) break ;;
+    FAILED|CREATE_FAILED)
+      aws bedrock-agentcore-control list-gateway-targets --region "$REGION" \
+        --gateway-identifier "$GATEWAY_ID" --output json | jq '.items[] | {name,status,statusReasons}'
+      echo "target failed" >&2; exit 1 ;;
+  esac
+  sleep 10
+done
 
 # ---------------------------------------------------------------------------
 # 5. Test tools/list through the Gateway
@@ -207,15 +227,33 @@ TOKEN="$(curl -s -X POST "https://${COGNITO_DOMAIN}.auth.${REGION}.amazoncognito
   -u "${CLIENT_ID}:${CLIENT_SECRET}" \
   -d "grant_type=client_credentials&scope=${SCOPE}" | jq -r .access_token)"
 
-curl -s -X POST "$GATEWAY_URL" \
+[ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || {
+  echo "    FAIL: could not mint a Cognito token -- check CLIENT_ID/CLIENT_SECRET/COGNITO_DOMAIN" >&2
+  exit 1
+}
+
+HTTP_CODE="$(curl -s -X POST "$GATEWAY_URL" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-  | tee /tmp/tools_list.json \
-  | grep -q query_db \
-  && echo "    PASS: query_db is discoverable" \
-  || { echo "    FAIL: query_db not found -- response:"; cat /tmp/tools_list.json; exit 1; }
+  -o /tmp/tools_list.json -w '%{http_code}')"
+
+echo "    HTTP ${HTTP_CODE}, $(wc -c < /tmp/tools_list.json) bytes"
+echo "--- response ---"
+jq . /tmp/tools_list.json 2>/dev/null || cat /tmp/tools_list.json
+echo "--- end ---"
+
+if grep -q query_db /tmp/tools_list.json; then
+  echo "    PASS: query_db is discoverable"
+else
+  echo "    FAIL: query_db not in tools/list (HTTP ${HTTP_CODE})" >&2
+  echo "    Targets on this gateway:" >&2
+  aws bedrock-agentcore-control list-gateway-targets --region "$REGION" \
+    --gateway-identifier "$GATEWAY_ID" --output json \
+    | jq '.items[] | {name, status, statusReasons}' >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Persist outputs
