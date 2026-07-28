@@ -22,6 +22,18 @@ SCOPE="${COGNITO_SCOPE:-datastream/mcp.access}"
 echo "==> identity"
 aws sts get-caller-identity --query '[Account,Arn]' --output text
 
+# direct_code_deploy shells out to uv to cross-compile deps for Linux ARM64.
+if ! command -v uv >/dev/null 2>&1; then
+  echo "==> uv not found; installing into the active environment"
+  python -m pip install --quiet uv
+  command -v uv >/dev/null 2>&1 || {
+    echo "uv still not on PATH. Install it manually:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+  }
+fi
+echo "==> uv $(uv --version 2>/dev/null | awk '{print $2}')"
+
 # ---------------------------------------------------------------------------
 # 1. Isolated build directory
 # ---------------------------------------------------------------------------
