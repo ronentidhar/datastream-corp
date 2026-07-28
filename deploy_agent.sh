@@ -182,23 +182,39 @@ CLIENT_TOKEN="$(curl -s -X POST \
 
 cd "$BUILD_DIR"
 
+# Session IDs are pinned to the agent version that first used them: deploy warns
+# "the previous agent remains accessible via the original session ID". Reusing a
+# fixed id after a redeploy silently routes to the OLD code, so mint fresh ids
+# per run. Minimum length is 33 characters.
+RUN_TAG="$(openssl rand -hex 12 2>/dev/null || date +%s%N)"
+SESSION_1="session_1_${RUN_TAG}"
+SESSION_2="session_2_${RUN_TAG}"
+ACTOR="${ACTOR:-alice-chen}"
+
 echo
-echo "==> session 1: state a preference"
+echo "==> session 1 (${SESSION_1}): state a preference as ${ACTOR}"
 agentcore invoke -a "$AGENT_NAME" \
   '{"prompt": "I prefer Python and JSON format reports"}' \
-  --headers "Actor-Id:alice-chen" \
-  --session-id session_0000000000000000000000001 \
+  --headers "Actor-Id:${ACTOR}" \
+  --session-id "$SESSION_1" \
   --bearer-token "$CLIENT_TOKEN" || true
 
 echo
-echo "==> session 2 (new session): does it recall the preference?"
+echo "==> waiting 60s for the UserFacts strategy to consolidate session 1"
+sleep 60
+
+echo
+echo "==> session 2 (${SESSION_2}): does it recall the preference?"
 agentcore invoke -a "$AGENT_NAME" \
   '{"prompt": "Query the database for employee count and generate a report"}' \
-  --headers "Actor-Id:alice-chen" \
-  --session-id session_0000000000000000000000002 \
+  --headers "Actor-Id:${ACTOR}" \
+  --session-id "$SESSION_2" \
   --bearer-token "$CLIENT_TOKEN" || true
 
 echo
-echo "Semantic extraction is asynchronous. If session 2 shows no recall, wait a
-minute and re-run the second invoke -- the UserFacts strategy has to consolidate
-session 1 before it is retrievable."
+echo "Check the resolved actor with:"
+echo "  aws logs tail /aws/bedrock-agentcore/runtimes/\$(basename \${AGENT_RUNTIME_ARN})-DEFAULT \\"
+echo "    --since 10m --region ${REGION} | grep actor_id"
+echo "Expect actor_id=${ACTOR}. Success on recall is a JSON-formatted report
+rather than a Markdown table. If it is still a table, extraction had not finished
+-- re-run the second invoke with another fresh --session-id."
