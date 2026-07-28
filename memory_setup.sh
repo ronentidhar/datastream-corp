@@ -56,6 +56,28 @@ fi
 echo "    MEMORY_ID=${MEMORY_ID}"
 
 # ---------------------------------------------------------------------------
+# Ensure the semantic strategy exists
+# ---------------------------------------------------------------------------
+# `agentcore memory create <name>` without --strategies produces an STM-only
+# memory with strategies: []. Rather than recreate, add the strategy in place.
+HAVE_STRATEGY="$(aws bedrock-agentcore-control get-memory \
+  --memory-id "$MEMORY_ID" --region "$REGION" \
+  --query "memory.strategies[?name=='${STRATEGY_NAME}'].strategyId | [0]" \
+  --output text 2>/dev/null || echo None)"
+
+if [ "$HAVE_STRATEGY" = "None" ] || [ -z "$HAVE_STRATEGY" ]; then
+  echo "==> no ${STRATEGY_NAME} strategy on this memory; adding it"
+  aws bedrock-agentcore-control update-memory \
+    --memory-id "$MEMORY_ID" \
+    --region "$REGION" \
+    --description "Enterprise memory for DataStream Corp agents" \
+    --memory-strategies "{\"addMemoryStrategies\":[{\"semanticMemoryStrategy\":{\"name\":\"${STRATEGY_NAME}\"}}]}" \
+    --query 'memory.{status:status}' --output text
+else
+  echo "    strategy ${STRATEGY_NAME} already present (${HAVE_STRATEGY})"
+fi
+
+# ---------------------------------------------------------------------------
 # Wait for the memory AND its strategy to go ACTIVE
 # ---------------------------------------------------------------------------
 # --wait covers the memory itself; the semantic strategy provisions its index
