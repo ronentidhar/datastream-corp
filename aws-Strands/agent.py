@@ -92,10 +92,15 @@ class ApprovalHook(HookProvider):
         registry.add_callback(BeforeToolCallEvent, self.approve)
 
     def approve(self, event: BeforeToolCallEvent) -> None:
-        if event.tool_use["name"] != "query_db":
+        # An AgentCore Gateway prefixes tool names with the target name, e.g.
+        # "datastream-mcp-target___query_db", so match on the suffix.
+        if not event.tool_use["name"].endswith("query_db"):
             return
 
-        sql = event.tool_use["input"].get("sql", "")
+        # The CloudFront-backed server names the parameter "query"; the local
+        # SQLite variants name it "sql". Accept either.
+        params = event.tool_use["input"]
+        sql = params.get("query") or params.get("sql") or ""
         if not is_destructive(sql):
             return
 
@@ -149,8 +154,9 @@ def drain_interrupts(agent_obj, result):
 # --------------------------------------------------------------------------
 DATA_PROMPT = """
 You are a database operator for DataStream Corp.
-Call list_schema first to learn the tables, then use query_db to carry out
-the request. You may run write statements when asked; a separate approval
+Use query_db to carry out the request. If you need to know the schema first,
+run: SELECT sql FROM sqlite_master WHERE type='table'.
+You may run write statements when asked; a separate approval
 system handles authorization, so do not refuse on safety grounds — just
 issue the SQL. State plainly whether your counts filter on employee status.
 """
