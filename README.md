@@ -10,16 +10,20 @@ you against what a first-party SDK gives you.
 | Config | In code | Loaded from disk (`CLAUDE.md`, hooks, skills, subagents) |
 | Task | Answer questions about the data | Find data-integrity anomalies in it (`--freeform` also answers plain questions) |
 | Specialists | `data_agent` + `weather_agent` as `@tool`-wrapped nested `Agent`s | `db-analyst` + `weather` as `.claude/agents/*.md`, invoked via `Task` |
-| Database | `datastream_corp.db` | same data, vendored copy |
-| MCP server | `mcp_server.py` | byte-identical copy of it |
+| Database | remote shared DB over HTTPS | `datastream_corp.db`, vendored copy |
+| MCP server | `mcp_server.py` (streamable-http, CloudFront proxy) | own copy (stdio, local SQLite) |
 | Write guard | `BeforeToolCallEvent` + `is_destructive()` | `PreToolUse` hook + same keyword set |
 
 **Same data, same MCP tools, same write-guard problem** — so this is a genuine
 like-for-like comparison of the two approaches. `claude-sdk/` keeps its own
 copies of `mcp_server.py` and `datastream_corp.db` rather than reaching across:
 the Strands folders are workshop exercises meant to be edited in place, and the
-service shouldn't change behaviour when someone completes a lab step. Check for
-drift with `diff claude-sdk/mcp_server.py aws-Strands/mcp_server.py`.
+service shouldn't change behaviour when someone completes a lab step.
+
+The two `mcp_server.py` files **have since diverged** — Phase 2 moved the Strands
+one onto streamable-http and a remote database, while the `claude-sdk/` copy still
+speaks stdio to the local `.db`. They serve the same data either way. See the
+difference with `diff claude-sdk/mcp_server.py aws-Strands/mcp_server.py`.
 
 They still share no code — but they do share **one virtualenv** at the repo
 root (Python 3.13), so there is a single `uv pip install` to run. See
@@ -27,6 +31,8 @@ root (Python 3.13), so there is a single `uv pip install` to run. See
 
 ## Links
 
+- **Working notes** — two-environment workflow, deploy order, and the gotchas that cost real time: [CLAUDE.md](CLAUDE.md)
+- **AgentCore deployment** — Phase 2: MCP runtime, Gateway, Memory, deployed agent: [docs/agentcore-deployment.md](docs/agentcore-deployment.md)
 - **Strands vs. the raw API** — framework vs. hand-rolled loop, and what it costs: [docs/strands_vs_raw_api.md](docs/strands_vs_raw_api.md)
 - **Strands vs. the Agent SDK** — which one for production: cost at volume, concurrency, observability, version risk: [docs/strands-vs-agent-sdk.md](docs/strands-vs-agent-sdk.md)
 - **Claude Agent SDK write-up** — config-loading model, hooks, costs: [claude-sdk/README.md](claude-sdk/README.md)
